@@ -53,7 +53,7 @@ function calcOzonMods() {
     const currentDayTime = new Date().getSeconds();
 }
 
-// tcp reqs ---------------------------------------------------------------
+// make tcp requests ---------------------------------------------------------------
 
 async function readRegProccess(deviceId, address, quantity) {
     const tcpReq = makeReadTCPRequest(deviceId, address, quantity);
@@ -68,15 +68,6 @@ function makeReadTCPRequest(deviceId, address, quantity) {
     ).replace(/:/g, "");
 }
 
-function formatTcpRequest(data, lastTransId) {
-    const tid = numberToHiLowBytes(lastTransId);
-    const pid = numberToHiLowBytes(0);
-    data.unshift(...numberToHiLowBytes(data.length));
-    data.unshift(...pid);
-    data.unshift(...tid);
-    return data.map(numberToHex8).join(":");
-}
-
 async function reuestToApi(tcpReq) {
     const result = (await got.post("/api/mbgate.json", {
         request: tcpReq,
@@ -84,6 +75,15 @@ async function reuestToApi(tcpReq) {
         dst: "self",
     }).text()).response;
     return result;
+}
+
+function formatTcpRequest(data, lastTransId) {
+    const tid = numberToHiLowBytes(lastTransId);
+    const pid = numberToHiLowBytes(0);
+    data.unshift(...numberToHiLowBytes(data.length));
+    data.unshift(...pid);
+    data.unshift(...tid);
+    return data.map(numberToHex8).join(":");
 }
 
 function parseTCPResponse(response, quantity) {
