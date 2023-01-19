@@ -1,10 +1,11 @@
 import got from "got";
 
-// let turnCompsOnDate = ;
-// let turnCompsOffDate = ;
-// compressor id = 5
-// ozonator id 6
-// ionizator id 7
+let turnCompsOnDate;
+let turnCompsOffDate;
+
+// compressorId 5
+// ozonatorId 6
+// ionizatorId 7
 
 async function run() {
     console.log("run");
@@ -23,12 +24,6 @@ setInterval(run, 5000);
 async function getStateFromRegisters() {
     const regs = await readRegisters();
     console.log(regs);
-    // {
-    //     [deviceId]: {
-    //         [address]: ""
-    //     }
-    // }
-    // { comps: {}, ozon: {}, ionz: {} }
     return composeState(regs);
 }
 
@@ -66,9 +61,11 @@ function composeState(regs) {
         },
         ozon: {
             events: composeEvents(regs[111][5520]),
+            relay: regs[6][2.3],
         },
         ionz: {
             events: composeEvents(regs[111][5720]),
+            relay: regs[7][2.3],
         }
     };
 }
@@ -87,7 +84,7 @@ function composeEvents(values) {
     }
 }
 
-// calc mods --------------------------------------------------------------
+// calc mods ---------------------------------------------------------------------
 
 function calcModifications(state) {
     const mods = {};
@@ -96,11 +93,72 @@ function calcModifications(state) {
     mods.ionz = calcIonzMods(state.ionz);
     return mods;
 }
+
+function calcCompsMods(state) {
+    const result = {};
+
+    let turnRelayOn = false;
+    if (state.sensorValue <= state.lowLimit) {
+        turnRelayOn = true;
+    } else if (state.sensorValue >= state.topLimit) {
+        turnRelayOn = false;
+    } else {
+        return result;
+    }
+
+    if (turnRelayOn) {
+        if (state.relay) {
+            turnCompsOnDate = undefined;
+            return result;
+        }
+        if (!turnCompsOnDate) {
+            turnCompsOnDate = new Date(new Date().setSeconds(new Date().getSeconds() + state.delayOn));
+            return result;
+        }
+        if (turnCompsOnDate > new Date()) {
+            return result;
+        }
+        return {
+            5: {
+                50: 14262
+            }
+        };
+    }
+
+    if (!turnRelayOn) {
+        if (!state.relay) {
+            turnCompsOffDate = undefined;
+            return result;
+        }
+        if (!turnCompsOffDate) {
+            turnCompsOffDate = new Date(new Date().setSeconds(new Date().getSeconds() + state.delayOff));
+            return result;
+        }
+        if (turnCompsOffDate > new Date()) {
+            return result;
+        }
+        return {
+            5: {
+                50: 14263
+            }
+        };
+
+    }
+
+    return result;
+}
+
 // ozon
-function calcOzonMods() {
+function calcOzonMods(state) {
     const currentDay = new Date().getDay();
     const currentDayTime = new Date().getSeconds();
 }
+
+function calcIonzMods(state) { }
+
+// change regs ---------------------------------------------------------------------
+
+function changeRegs() { }
 
 // make tcp requests ---------------------------------------------------------------
 
