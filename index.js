@@ -37,7 +37,11 @@ async function readRegisters() {
     // sensor value
     result[1] = { 0: (await readRegProccess(1, 0, 1))[0] * 0.1 };
     // compressor relay state
-    result[5] = { 0: (await readRegProccess(5, 2.3, 1)) };
+    result[5] = { 2.3: (await readRegProccess(5, 2.3, 1)) };
+    // ozonator relay state
+    result[6] = { 2.3: (await readRegProccess(6, 2.3, 1)) };
+    // ionyzer relay state
+    result[7] = { 2.3: (await readRegProccess(7, 2.3, 1)) };
     // sensor settings
     result[111] = {};
     const sensorSettings = await readRegProccess(111, 5500, 6);
@@ -47,6 +51,40 @@ async function readRegisters() {
     const ionzEvents = await readRegProccess(111, 5720, 90);
     result[111][5720] = ionzEvents;
     return result;
+}
+
+function composeState(regs) {
+    return {
+        comps: {
+            relay: regs[5][2.3],
+            sensorValue: regs[1][0] + regs[111][5500][0],
+            setting: regs[111][5500][1],
+            topLimit: regs[111][5500][1] + regs[111][5500][2],
+            lowLimit: regs[111][5500][1] + regs[111][5500][4],
+            delayOn: regs[111][5500][3],
+            delayOff: regs[111][5500][5],
+        },
+        ozon: {
+            events: composeEvents(regs[111][5520]),
+        },
+        ionz: {
+            events: composeEvents(regs[111][5720]),
+        }
+    };
+}
+
+function composeEvents(values) {
+    const events = [];
+    for (let i = 0; i < values.length; i += 3) {
+        if (values[i] === 0 && values[i + 1] === 0 && values[i + 2] === 0) {
+            return events;
+        }
+        events.push({
+            day: values[i],
+            timeStartMin: values[i + 1],
+            durationS: values[i + 2],
+        });
+    }
 }
 
 // calc mods --------------------------------------------------------------
