@@ -10,9 +10,9 @@ let turnCompsOffDate;
 async function run() {
     console.log("run");
     const state = await getStateFromRegisters();
-
+    console.log(state);
     const modifyRegs = calcModifications(state);
-
+    console.log(modifyRegs);
     // write to regs
     changeRegs(modifyRegs);
 }
@@ -23,7 +23,6 @@ setInterval(run, 5000);
 
 async function getStateFromRegisters() {
     const regs = await readRegisters();
-    console.log(regs);
     return composeState(regs);
 }
 
@@ -32,11 +31,11 @@ async function readRegisters() {
     // sensor value
     result[1] = { 0: (await readRegProccess(1, 0, 1))[0] * 0.1 };
     // compressor relay state
-    result[5] = { 2.3: (await readRegProccess(5, 2.3, 1)) };
+    result[5] = { 2.3: (await readRegProccess(5, 2.3, 1))[0] };
     // ozonator relay state
-    result[6] = { 2.3: (await readRegProccess(6, 2.3, 1)) };
+    result[6] = { 2.3: (await readRegProccess(6, 2.3, 1))[0] };
     // ionyzer relay state
-    result[7] = { 2.3: (await readRegProccess(7, 2.3, 1)) };
+    result[7] = { 2.3: (await readRegProccess(7, 2.3, 1))[0] };
     // sensor settings
     result[111] = {};
     const sensorSettings = await readRegProccess(111, 5500, 6);
@@ -55,7 +54,7 @@ function composeState(regs) {
             sensorValue: regs[1][0] + regs[111][5500][0],
             setting: regs[111][5500][1],
             topLimit: regs[111][5500][1] + regs[111][5500][2],
-            lowLimit: regs[111][5500][1] + regs[111][5500][4],
+            lowLimit: regs[111][5500][1] - regs[111][5500][4],
             delayOn: regs[111][5500][3],
             delayOff: regs[111][5500][5],
         },
@@ -79,7 +78,7 @@ function composeEvents(values) {
         events.push({
             day: values[i],
             timeStartMin: values[i + 1],
-            durationS: values[i + 2],
+            durationMin: values[i + 2],
         });
     }
 }
@@ -95,28 +94,26 @@ function calcModifications(state) {
 }
 
 function calcCompsMods(state) {
-    const result = {};
-
     let turnRelayOn = false;
     if (state.sensorValue <= state.lowLimit) {
         turnRelayOn = true;
     } else if (state.sensorValue >= state.topLimit) {
         turnRelayOn = false;
     } else {
-        return result;
+        return {};
     }
 
     if (turnRelayOn) {
         if (state.relay) {
             turnCompsOnDate = undefined;
-            return result;
+            return {};
         }
         if (!turnCompsOnDate) {
-            turnCompsOnDate = new Date(new Date().setSeconds(new Date().getSeconds() + state.delayOn));
-            return result;
+            turnCompsOnDate = new Date(new Date().setSeconds(new Date().getSeconds() + state.delayOn * 60));
+            return {};
         }
         if (turnCompsOnDate > new Date()) {
-            return result;
+            return {};
         }
         return {
             5: {
@@ -128,14 +125,14 @@ function calcCompsMods(state) {
     if (!turnRelayOn) {
         if (!state.relay) {
             turnCompsOffDate = undefined;
-            return result;
+            return {};
         }
         if (!turnCompsOffDate) {
-            turnCompsOffDate = new Date(new Date().setSeconds(new Date().getSeconds() + state.delayOff));
-            return result;
+            turnCompsOffDate = new Date(new Date().setSeconds(new Date().getSeconds() + state.delayOff * 60));
+            return {};
         }
         if (turnCompsOffDate > new Date()) {
-            return result;
+            return {};
         }
         return {
             5: {
@@ -145,16 +142,81 @@ function calcCompsMods(state) {
 
     }
 
-    return result;
+    return {};
 }
 
 // ozon
 function calcOzonMods(state) {
     const currentDay = new Date().getDay();
-    const currentDayTime = new Date().getSeconds();
+    const currentDayMin = new Date().getMinutes() + (new Date().getHours() * 60);
+
+    let turnRelayOn = false;
+    for (const event of state.events) {
+        if (currentDay === state.day && currentDayMin >= state.timeStartMin && currentDayMin <= state.timeStartMin + state.durationMin) {
+            turnRelayOn = true;
+        }
+    }
+
+    if (turnRelayOn) {
+        if (state.relay) {
+            return {};
+        }
+        return {
+            6: {
+                50: 14262
+            }
+        };
+    }
+
+    if (!turnRelayOn) {
+        if (!state.relay) {
+            return {};
+        }
+        return {
+            6: {
+                50: 14263
+            }
+        };
+    }
+
+    return {};
 }
 
-function calcIonzMods(state) { }
+function calcIonzMods(state) {
+    const currentDay = new Date().getDay();
+    const currentDayMin = new Date().getMinutes() + (new Date().getHours() * 60);
+
+    let turnRelayOn = false;
+    for (const event of state.events) {
+        if (currentDay === state.day && currentDayMin >= state.timeStartMin && currentDayMin <= state.timeStartMin + state.durationMin) {
+            turnRelayOn = true;
+        }
+    }
+
+    if (turnRelayOn) {
+        if (state.relay) {
+            return {};
+        }
+        return {
+            7: {
+                50: 14262
+            }
+        };
+    }
+
+    if (!turnRelayOn) {
+        if (!state.relay) {
+            return {};
+        }
+        return {
+            7: {
+                50: 14263
+            }
+        };
+    }
+
+    return {};
+}
 
 // change regs ---------------------------------------------------------------------
 
