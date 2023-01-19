@@ -8,7 +8,6 @@ import got from "got";
 
 async function run() {
     console.log("run");
-
     const state = await getStateFromRegisters();
 
     const modifyRegs = calcModifications(state);
@@ -23,6 +22,7 @@ setInterval(run, 5000);
 
 async function getStateFromRegisters() {
     const regs = await readRegisters();
+    console.log(regs);
     // {
     //     [deviceId]: {
     //         [address]: ""
@@ -34,8 +34,19 @@ async function getStateFromRegisters() {
 
 async function readRegisters() {
     const result = {};
-    const sensorVal = (await readRegProccess(1, 0, 1)) * 0.1;
-    console.log(sensorVal);
+    // sensor value
+    result[1] = { 0: (await readRegProccess(1, 0, 1))[0] * 0.1 };
+    // compressor relay state
+    result[5] = { 0: (await readRegProccess(5, 2.3, 1)) };
+    // sensor settings
+    result[111] = {};
+    const sensorSettings = await readRegProccess(111, 5500, 6);
+    result[111][5500] = sensorSettings;
+    const ozonEvents = await readRegProccess(111, 5520, 90);
+    result[111][5520] = ozonEvents;
+    const ionzEvents = await readRegProccess(111, 5720, 90);
+    result[111][5720] = ionzEvents;
+    return result;
 }
 
 // calc mods --------------------------------------------------------------
@@ -56,25 +67,37 @@ function calcOzonMods() {
 // make tcp requests ---------------------------------------------------------------
 
 async function readRegProccess(deviceId, address, quantity) {
-    const tcpReq = makeReadTCPRequest(deviceId, address, quantity);
-    const tcpRes = await reuestToApi(tcpReq);
+    const readReq = makeReadRequest(deviceId, address, quantity);
+    const tcpRes = await reuestToApi(readReq, deviceId);
     return parseTCPResponse(tcpRes, quantity);
 }
 
-function makeReadTCPRequest(deviceId, address, quantity) {
-    return formatTcpRequest(
-        [deviceId, Number("0x03"), ...numberToHiLowBytes(address), ...numberToHiLowBytes(quantity)],
-        0,
-    ).replace(/:/g, "");
+function makeReadRequest(deviceId, address, quantity) {
+    const data = [deviceId, Number("0x03"), ...numberToHiLowBytes(address), ...numberToHiLowBytes(quantity)];
+    if (deviceId === 111) {
+        return formatTcpRequest(
+            data,
+            0,
+        );
+    }
+    return formatRtuRequest(data);
 }
 
-async function reuestToApi(tcpReq) {
-    const result = (await got.post("/api/mbgate.json", {
-        request: tcpReq,
-        type: "1",
-        dst: "self",
-    }).text()).response;
-    return result;
+async function reuestToApi(request, address) {
+    const data = {
+        request: request,
+        type: address === 111 ? "1" : "0",
+        dst: address === 111 ? "self" : "ttyUSB0",
+    };
+    const result = (await got("http://127.0.0.1:8502/api/mbgate.json", {
+        method: "post",
+        responseType: "text",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams(data).toString(),
+    })).body;
+    return JSON.parse(result).response;
 }
 
 function formatTcpRequest(data, lastTransId) {
@@ -83,7 +106,20 @@ function formatTcpRequest(data, lastTransId) {
     data.unshift(...numberToHiLowBytes(data.length));
     data.unshift(...pid);
     data.unshift(...tid);
-    return data.map(numberToHex8).join(":");
+    return data.map(numberToHex8).join("");
+}
+
+function formatRtuRequest(data) {
+    const res = `${data.map(numberToHex8).join("")}`;
+    return res;
+}
+
+function numberToHiLowBytes(value) {
+    return [(value >> 8) & 0xff, value & 0xff];
+}
+
+function numberToHex8(value) {
+    return value.toString(16).padStart(2, "0");
 }
 
 function parseTCPResponse(response, quantity) {
