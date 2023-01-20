@@ -1,16 +1,18 @@
 import got from "got";
 
-let turnCompsOnDate;
-let turnCompsOffDate;
-
 const OPCB_ID = 111;
 const SENSOR_ID = 1;
 const COMPRESSOR_ID = 5;
 const OZONATOR_ID = 6;
 const IONIZATOR_ID = 7;
 
+let turnCompsOnDate;
+let turnCompsOffDate;
+let state;
+
 async function run() {
-    const state = await getStateFromRegisters();
+    state = undefined;
+    state = await getStateFromRegisters();
     const modifyRegs = calcModifications(state);
     // write to regs
     await changeRegs(modifyRegs);
@@ -20,6 +22,8 @@ try {
     run();
     setInterval(run, 2000);
 } catch (err) {
+    console.log(`Exit with error: ${err}`);
+    console.log("State:", state);
     process.exit(1);
 }
 
