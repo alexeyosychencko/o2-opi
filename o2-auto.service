@@ -1,0 +1,18 @@
+[Unit]
+Documentation="https://github.com/overvis/opcb-release/"
+Description=O2 sensor automatization daemon
+Wants=network.target
+After=syslog.target network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+OOMScoreAdjust=-100
+ExecStart=/usr/bin/node /root/o2-auto/index.js
+TimeoutSec=3
+RestartSec=2
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

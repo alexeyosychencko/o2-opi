@@ -8,16 +8,14 @@ let turnCompsOffDate;
 // ionizatorId 7
 
 async function run() {
-    console.log("run");
     const state = await getStateFromRegisters();
-    console.log(state);
     const modifyRegs = calcModifications(state);
-    console.log(modifyRegs);
     // write to regs
     await changeRegs(modifyRegs);
 }
 
-setInterval(run, 5000);
+run();
+setInterval(run, 30000);
 
 // read regs --------------------------------------------------------------
 
