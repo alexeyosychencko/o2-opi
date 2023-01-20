@@ -3,9 +3,11 @@ import got from "got";
 let turnCompsOnDate;
 let turnCompsOffDate;
 
-// compressorId 5
-// ozonatorId 6
-// ionizatorId 7
+const OPCB_ID = 111;
+const SENSOR_ID = 1;
+const COMPRESSOR_ID = 5;
+const OZONATOR_ID = 6;
+const IONIZATOR_ID = 7;
 
 async function run() {
     const state = await getStateFromRegisters();
@@ -15,7 +17,7 @@ async function run() {
 }
 
 run();
-setInterval(run, 30000);
+setInterval(run, 2000);
 
 // read regs --------------------------------------------------------------
 
@@ -27,42 +29,42 @@ async function getStateFromRegisters() {
 async function readRegisters() {
     const result = {};
     // sensor value
-    result[1] = { 0: (await readRegProccess(1, 0, 1))[0] * 0.1 };
+    result[SENSOR_ID] = { 0: (await readRegProccess(SENSOR_ID, 0, 1))[0] * 0.1 };
     // compressor relay state
-    result[5] = { 2.3: (await readRegProccess(5, 2.3, 1))[0] };
+    result[COMPRESSOR_ID] = { 2.3: (await readRegProccess(COMPRESSOR_ID, 2.3, 1))[0] };
     // ozonator relay state
-    result[6] = { 2.3: (await readRegProccess(6, 2.3, 1))[0] };
+    result[OZONATOR_ID] = { 2.3: (await readRegProccess(OZONATOR_ID, 2.3, 1))[0] };
     // ionyzer relay state
-    result[7] = { 2.3: (await readRegProccess(7, 2.3, 1))[0] };
+    result[IONIZATOR_ID] = { 2.3: (await readRegProccess(IONIZATOR_ID, 2.3, 1))[0] };
     // sensor settings
-    result[111] = {};
-    const sensorSettings = await readRegProccess(111, 5500, 6);
-    result[111][5500] = sensorSettings;
-    const ozonEvents = await readRegProccess(111, 5520, 90);
-    result[111][5520] = ozonEvents;
-    const ionzEvents = await readRegProccess(111, 5720, 90);
-    result[111][5720] = ionzEvents;
+    result[OPCB_ID] = {};
+    const sensorSettings = await readRegProccess(OPCB_ID, 5500, 6);
+    result[OPCB_ID][5500] = sensorSettings;
+    const ozonEvents = await readRegProccess(OPCB_ID, 5520, 90);
+    result[OPCB_ID][5520] = ozonEvents;
+    const ionzEvents = await readRegProccess(OPCB_ID, 5720, 90);
+    result[OPCB_ID][5720] = ionzEvents;
     return result;
 }
 
 function composeState(regs) {
     return {
         comps: {
-            relay: regs[5][2.3],
-            sensorValue: regs[1][0] + regs[111][5500][0] / 10,
-            setting: regs[111][5500][1] / 10,
-            topLimit: regs[111][5500][1] / 10 + regs[111][5500][2] / 10,
-            lowLimit: regs[111][5500][1] / 10 - regs[111][5500][4] / 10,
-            delayOn: regs[111][5500][3],
-            delayOff: regs[111][5500][5],
+            relay: regs[COMPRESSOR_ID][2.3],
+            sensorValue: regs[SENSOR_ID][0] + regs[OPCB_ID][5500][0] / 10,
+            setting: regs[OPCB_ID][5500][1] / 10,
+            topLimit: regs[OPCB_ID][5500][1] / 10 + regs[OPCB_ID][5500][2] / 10,
+            lowLimit: regs[OPCB_ID][5500][1] / 10 - regs[OPCB_ID][5500][4] / 10,
+            delayOn: regs[OPCB_ID][5500][3],
+            delayOff: regs[OPCB_ID][5500][5],
         },
         ozon: {
-            events: composeEvents(regs[111][5520]),
-            relay: regs[6][2.3],
+            events: composeEvents(regs[OPCB_ID][5520]),
+            relay: regs[OZONATOR_ID][2.3],
         },
         ionz: {
-            events: composeEvents(regs[111][5720]),
-            relay: regs[7][2.3],
+            events: composeEvents(regs[OPCB_ID][5720]),
+            relay: regs[IONIZATOR_ID][2.3],
         }
     };
 }
@@ -246,7 +248,7 @@ async function readRegProccess(deviceId, address, quantity) {
 
 function makeReadRequest(deviceId, address, quantity) {
     const data = [deviceId, Number("0x03"), ...numberToHiLowBytes(address), ...numberToHiLowBytes(quantity)];
-    if (deviceId === 111) {
+    if (deviceId === OPCB_ID) {
         return formatTcpRequest(data, 0);
     }
     return formatRtuRequest(data);
@@ -258,7 +260,7 @@ function makeWriteTCPRequest(deviceId, address, value) {
         Number("0x06"),
         ...numberToHiLowBytes(Number(address)),
         ...numberToHiLowBytes(value)];
-    if (deviceId === 111) {
+    if (deviceId === OPCB_ID) {
         return formatTcpRequest(data, 0);
     }
     return formatRtuRequest(data);
@@ -267,8 +269,8 @@ function makeWriteTCPRequest(deviceId, address, value) {
 async function reuestToApi(request, address) {
     const data = {
         request: request,
-        type: address === 111 ? "1" : "0",
-        dst: address === 111 ? "self" : "ttyUSB0",
+        type: address === OPCB_ID ? "1" : "0",
+        dst: address === OPCB_ID ? "self" : "ttyUSB0",
     };
     const result = (await got("http://127.0.0.1:8502/api/mbgate.json", {
         method: "post",
