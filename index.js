@@ -5,6 +5,7 @@ const SENSOR_ID = 1;
 const COMPRESSOR_ID = 5;
 const OZONATOR_ID = 6;
 const IONIZATOR_ID = 7;
+const TOP_ERROR_SENSOR_VALUE = 1000;
 
 let turnCompsOnDate;
 let turnCompsOffDate;
@@ -14,13 +15,12 @@ async function run() {
     state = undefined;
     state = await getStateFromRegisters();
     const modifyRegs = calcModifications(state);
-    // write to regs
     await changeRegs(modifyRegs);
 }
 
 try {
     run();
-    setInterval(run, 2000);
+    setInterval(run, 5000);
 } catch (err) {
     console.log(`Exit with error: ${err}`);
     console.log("State:", state);
@@ -37,7 +37,7 @@ async function getStateFromRegisters() {
 async function readRegisters() {
     const result = {};
     // sensor value
-    result[SENSOR_ID] = { 0: (await readRegProccess(SENSOR_ID, 0, 1))[0] * 0.1 };
+    result[SENSOR_ID] = { 0: (await readRegProccess(SENSOR_ID, 0, 1))[0] };
     // compressor relay state
     result[COMPRESSOR_ID] = { 2.3: (await readRegProccess(COMPRESSOR_ID, 2.3, 1))[0] };
     // ozonator relay state
@@ -46,6 +46,7 @@ async function readRegisters() {
     result[IONIZATOR_ID] = { 2.3: (await readRegProccess(IONIZATOR_ID, 2.3, 1))[0] };
     // sensor settings
     result[OPCB_ID] = {};
+    // [addVal setting hystOn delayOn hystOff delayOff]
     const sensorSettings = await readRegProccess(OPCB_ID, 5500, 6);
     result[OPCB_ID][5500] = sensorSettings;
     const ozonEvents = await readRegProccess(OPCB_ID, 5520, 90);
@@ -59,7 +60,7 @@ function composeState(regs) {
     return {
         comps: {
             relay: regs[COMPRESSOR_ID][2.3],
-            sensorValue: regs[SENSOR_ID][0] + regs[OPCB_ID][5500][0] / 10,
+            sensorValue: regs[SENSOR_ID][0] / 10 + regs[OPCB_ID][5500][0] / 10,
             setting: regs[OPCB_ID][5500][1] / 10,
             topLimit: regs[OPCB_ID][5500][1] / 10 + regs[OPCB_ID][5500][2] / 10,
             lowLimit: regs[OPCB_ID][5500][1] / 10 - regs[OPCB_ID][5500][4] / 10,
@@ -102,6 +103,9 @@ function calcModifications(state) {
 }
 
 function calcCompsMods(state) {
+    if (state.sensorValue > TOP_ERROR_SENSOR_VALUE) {
+        return {};
+    }
     let turnRelayOn = false;
     if (state.sensorValue <= state.lowLimit) {
         turnRelayOn = true;
@@ -128,7 +132,7 @@ function calcCompsMods(state) {
             return {};
         }
         return {
-            5: {
+            [COMPRESSOR_ID]: {
                 50: 14262
             }
         };
@@ -147,7 +151,7 @@ function calcCompsMods(state) {
             return {};
         }
         return {
-            5: {
+            [COMPRESSOR_ID]: {
                 50: 14263
             }
         };
@@ -174,7 +178,7 @@ function calcOzonMods(state) {
             return {};
         }
         return {
-            6: {
+            [OZONATOR_ID]: {
                 50: 14262
             }
         };
@@ -185,7 +189,7 @@ function calcOzonMods(state) {
             return {};
         }
         return {
-            6: {
+            [OZONATOR_ID]: {
                 50: 14263
             }
         };
@@ -210,7 +214,7 @@ function calcIonzMods(state) {
             return {};
         }
         return {
-            7: {
+            [IONIZATOR_ID]: {
                 50: 14262
             }
         };
@@ -221,7 +225,7 @@ function calcIonzMods(state) {
             return {};
         }
         return {
-            7: {
+            [IONIZATOR_ID]: {
                 50: 14263
             }
         };
