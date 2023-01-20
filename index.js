@@ -9,23 +9,22 @@ const TOP_ERROR_SENSOR_VALUE = 1000;
 
 let turnCompsOnDate;
 let turnCompsOffDate;
-let state;
 
 async function run() {
-    state = undefined;
-    state = await getStateFromRegisters();
-    const modifyRegs = calcModifications(state);
-    await changeRegs(modifyRegs);
+    let state = undefined;
+    try {
+        state = await getStateFromRegisters();
+        const modifyRegs = calcModifications(state);
+        await changeRegs(modifyRegs);
+    } catch (err) {
+        console.log(`Exit with error: ${err}`);
+        console.log("State:", state);
+        process.exit(1);
+    }
 }
 
-try {
-    run();
-    setInterval(run, 5000);
-} catch (err) {
-    console.log(`Exit with error: ${err}`);
-    console.log("State:", state);
-    process.exit(1);
-}
+run();
+setInterval(run, 5000);
 
 // read regs --------------------------------------------------------------
 
@@ -241,9 +240,7 @@ async function changeRegs(modifyRegs) {
         for (const [deviceId, addresses] of Object.entries(devices)) {
             for (const [address, value] of Object.entries(addresses)) {
                 const writeReq = makeWriteTCPRequest(deviceId, address, value);
-                console.log(writeReq, deviceId);
                 const tcpRes = await reuestToApi(writeReq, deviceId);
-                console.log(tcpRes);
             }
         }
     }
