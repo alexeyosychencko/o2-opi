@@ -10,7 +10,7 @@ let turnCompsOffDate;
 async function run() {
     console.log("run");
     const state = await getStateFromRegisters();
-    // console.log(state);
+    console.log(state);
     const modifyRegs = calcModifications(state);
     console.log(modifyRegs);
     // write to regs
@@ -51,10 +51,10 @@ function composeState(regs) {
     return {
         comps: {
             relay: regs[5][2.3],
-            sensorValue: regs[1][0] + regs[111][5500][0],
-            setting: regs[111][5500][1],
-            topLimit: regs[111][5500][1] + regs[111][5500][2],
-            lowLimit: regs[111][5500][1] - regs[111][5500][4],
+            sensorValue: regs[1][0] + regs[111][5500][0] / 10,
+            setting: regs[111][5500][1] / 10,
+            topLimit: regs[111][5500][1] / 10 + regs[111][5500][2] / 10,
+            lowLimit: regs[111][5500][1] / 10 - regs[111][5500][4] / 10,
             delayOn: regs[111][5500][3],
             delayOff: regs[111][5500][5],
         },
