@@ -16,8 +16,12 @@ async function run() {
     await changeRegs(modifyRegs);
 }
 
-run();
-setInterval(run, 2000);
+try {
+    run();
+    setInterval(run, 2000);
+} catch (err) {
+    process.exit(1);
+}
 
 // read regs --------------------------------------------------------------
 
