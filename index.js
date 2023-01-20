@@ -97,9 +97,13 @@ function calcCompsMods(state) {
     let turnRelayOn = false;
     if (state.sensorValue <= state.lowLimit) {
         turnRelayOn = true;
+        turnCompsOffDate = undefined;
     } else if (state.sensorValue >= state.topLimit) {
         turnRelayOn = false;
+        turnCompsOnDate = undefined;
     } else {
+        turnCompsOnDate = undefined;
+        turnCompsOffDate = undefined;
         return {};
     }
 
