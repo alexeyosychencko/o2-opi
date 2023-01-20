@@ -10,11 +10,11 @@ let turnCompsOffDate;
 async function run() {
     console.log("run");
     const state = await getStateFromRegisters();
-    console.log(state);
+    // console.log(state);
     const modifyRegs = calcModifications(state);
     console.log(modifyRegs);
     // write to regs
-    changeRegs(modifyRegs);
+    await changeRegs(modifyRegs);
 }
 
 setInterval(run, 5000);
@@ -156,7 +156,7 @@ function calcOzonMods(state) {
 
     let turnRelayOn = false;
     for (const event of state.events) {
-        if (currentDay === state.day && currentDayMin >= state.timeStartMin && currentDayMin <= state.timeStartMin + state.durationMin) {
+        if (currentDay === event.day && currentDayMin >= event.timeStartMin && currentDayMin <= event.timeStartMin + event.durationMin) {
             turnRelayOn = true;
         }
     }
@@ -192,7 +192,7 @@ function calcIonzMods(state) {
 
     let turnRelayOn = false;
     for (const event of state.events) {
-        if (currentDay === state.day && currentDayMin >= state.timeStartMin && currentDayMin <= state.timeStartMin + state.durationMin) {
+        if (currentDay === event.day && currentDayMin >= event.timeStartMin && currentDayMin <= event.timeStartMin + event.durationMin) {
             turnRelayOn = true;
         }
     }
@@ -224,7 +224,19 @@ function calcIonzMods(state) {
 
 // change regs ---------------------------------------------------------------------
 
-function changeRegs() { }
+async function changeRegs(modifyRegs) {
+    for (const [section, devices] of Object.entries(modifyRegs)) {
+        for (const [deviceId, addresses] of Object.entries(devices)) {
+            for (const [address, value] of Object.entries(addresses)) {
+                const writeReq = makeWriteTCPRequest(deviceId, address, value);
+                console.log(writeReq, deviceId);
+                const tcpRes = await reuestToApi(writeReq, deviceId);
+                console.log(tcpRes);
+            }
+        }
+    }
+
+}
 
 // make tcp requests ---------------------------------------------------------------
 
@@ -237,10 +249,19 @@ async function readRegProccess(deviceId, address, quantity) {
 function makeReadRequest(deviceId, address, quantity) {
     const data = [deviceId, Number("0x03"), ...numberToHiLowBytes(address), ...numberToHiLowBytes(quantity)];
     if (deviceId === 111) {
-        return formatTcpRequest(
-            data,
-            0,
-        );
+        return formatTcpRequest(data, 0);
+    }
+    return formatRtuRequest(data);
+}
+
+function makeWriteTCPRequest(deviceId, address, value) {
+    const data = [
+        Number(deviceId),
+        Number("0x06"),
+        ...numberToHiLowBytes(Number(address)),
+        ...numberToHiLowBytes(value)];
+    if (deviceId === 111) {
+        return formatTcpRequest(data, 0);
     }
     return formatRtuRequest(data);
 }
@@ -272,12 +293,29 @@ function formatTcpRequest(data, lastTransId) {
 }
 
 function formatRtuRequest(data) {
-    const res = `${data.map(numberToHex8).join("")}`;
+    const crc16Arr = numberToHex16(getCrc16(data)).split(":");
+    const res = `${data.map(numberToHex8).join("")}${crc16Arr[1]}${crc16Arr[0]}`;
     return res;
+}
+
+function getCrc16(data) {
+    let crc = 0xffff;
+    for (let b of data) {
+        for (let i = 0; i < 8; i++) {
+            const first8b = crc & 0xff;
+            crc = (b ^ first8b) & 1 ? (crc >> 1) ^ 0xa001 : crc >> 1;
+            b >>= 1;
+        }
+    }
+    return crc;
 }
 
 function numberToHiLowBytes(value) {
     return [(value >> 8) & 0xff, value & 0xff];
+}
+
+function numberToHex16(value) {
+    return `${numberToHex8(value >> 8)}:${numberToHex8(value & 255)}`;
 }
 
 function numberToHex8(value) {
