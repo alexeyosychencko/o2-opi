@@ -1,4 +1,5 @@
 import got from "got";
+import moment from "moment-timezone";
 
 const OPCB_ID = 111;
 const SENSOR_ID = 1;
@@ -52,6 +53,7 @@ async function readRegisters() {
     result[OPCB_ID][5520] = ozonEvents;
     const ionzEvents = await readRegProccess(OPCB_ID, 5720, 90);
     result[OPCB_ID][5720] = ionzEvents;
+    result[OPCB_ID][5515] = (await readRegProccess(OPCB_ID, 5515, 1))[0];
     return result;
 }
 
@@ -69,10 +71,12 @@ function composeState(regs) {
         ozon: {
             events: composeEvents(regs[OPCB_ID][5520]),
             relay: regs[OZONATOR_ID][2.3],
+            tzIndex: regs[OPCB_ID][5515],
         },
         ionz: {
             events: composeEvents(regs[OPCB_ID][5720]),
             relay: regs[IONIZATOR_ID][2.3],
+            tzIndex: regs[OPCB_ID][5515],
         }
     };
 }
@@ -162,8 +166,12 @@ function calcCompsMods(state) {
 
 // ozon
 function calcOzonMods(state) {
-    const currentDay = new Date().getDay();
-    const currentDayMin = new Date().getMinutes() + (new Date().getHours() * 60);
+    const timeZone = moment.tz.names()[state.tzIndex];
+    const tzOffset = moment.tz(timeZone).utcOffset() * 60 * 1000;
+    const offset = new Date().getTimezoneOffset() * 60 * 1000;
+    const date = new Date(new Date().getTime() + offset + tzOffset);
+    const currentDay = date.getDay();
+    const currentDayMin = date.getMinutes() + (date.getHours() * 60);
 
     let turnRelayOn = false;
     for (const event of state.events) {
@@ -198,8 +206,12 @@ function calcOzonMods(state) {
 }
 
 function calcIonzMods(state) {
-    const currentDay = new Date().getDay();
-    const currentDayMin = new Date().getMinutes() + (new Date().getHours() * 60);
+    const timeZone = moment.tz.names()[state.tzIndex];
+    const tzOffset = moment.tz(timeZone).utcOffset() * 60 * 1000;
+    const offset = new Date().getTimezoneOffset() * 60 * 1000;
+    const date = new Date(new Date().getTime() + offset + tzOffset);
+    const currentDay = date.getDay();
+    const currentDayMin = date.getMinutes() + (date.getHours() * 60);
 
     let turnRelayOn = false;
     for (const event of state.events) {
