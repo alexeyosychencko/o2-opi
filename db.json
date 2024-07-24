@@ -1,0 +1,37 @@
+[
+  {
+    "orderId": 1,
+    "customerId": 8,
+    "employeeName": Mario,
+    "orderPrice": 150.3,
+    "orderStatus": proccesing,
+  },
+  {
+    "orderId": 2,
+    "customerId": 5,
+    "employeeName": Mario,
+    "orderPrice": 160.5,
+    "orderStatus": booked,
+  },
+  {
+    "orderId": 3,
+    "customerId": 1,
+    "employeeName": Samir,
+    "orderPrice": 110.5,
+    "orderStatus": booked,
+  },
+  {
+    "orderId": 4,
+    "customerId": 2,
+    "employeeName": Amelie,
+    "orderPrice": 210.5,
+    "orderStatus": booked,
+  },
+  {
+    "orderId": 5,
+    "customerId": 9,
+    "employeeName": Asdf,
+    "orderPrice": 260.3,
+    "orderStatus": proccesing,
+  },
+]
