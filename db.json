@@ -32,6 +32,6 @@
     "customerId": 9,
     "employeeName": "Asdf",
     "orderPrice": 260.3,
-    "orderStatus": "proccesing",
+    "orderStatus": "proccesing"
   }
 ]
